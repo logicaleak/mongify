@@ -8,6 +8,8 @@ import (
 	"net"
 )
 
+var database string
+
 
 func NewMongoSession(addrs string) (*mgo.Session, error) {
 	tlsConfig := &tls.Config{}
@@ -46,6 +48,10 @@ func NewMongoConnector(addrs string, database string, userCollection string, mes
 		userCollection: userCollection,
 		messageCollection: messageCollection,
 	}, nil
+}
+
+func (selfPtr *MongoConnector) GetDatabase() *mgo.Database {
+	return selfPtr.GetSession().DB(selfPtr.mainDatabase)
 }
 
 func (selfPtr *MongoConnector) GetSession() *mgo.Session {

@@ -5,16 +5,24 @@ import (
 )
 import (
 	"mongoconnector/connector"
+	"fmt"
 )
 
+
+type TheCollection struct {
+	Thing string `bson:"Thing"`
+}
+
 type A struct {
-	FindByThing func(string) string
+	FindByThingFromTheCollection func(string) (TheCollection, mongoconnector.Error)
 }
 
 
 func main() {
+	mongoconnector.InitializeMongoConnectorSingleton("localhost:27017", "rtest", "coll", "coll2")
 	a := A{}
 	returnedInterface := mongoconnector.Implement(&a)
 	newA := returnedInterface.(A)
-	newA.FindByThing("fuck")
+	tc, _ := newA.FindByThingFromTheCollection("thing")
+	fmt.Println(tc)
 }
