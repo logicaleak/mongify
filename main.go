@@ -14,7 +14,7 @@ type TheCollection struct {
 }
 
 type A struct {
-	FindByThingFromTheCollection func(string) (TheCollection, mongoconnector.Error)
+	FindByThingFromTheCollection func(string) (TheCollection, error)
 }
 
 
