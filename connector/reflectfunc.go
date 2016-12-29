@@ -7,6 +7,7 @@ import (
 	"strings"
 	"gopkg.in/mgo.v2/bson"
 	"fmt"
+	"unicode"
 )
 
 const findRegexString = "FindBy(.*)From(.*)"
@@ -24,16 +25,57 @@ func (self Error) Error() string {
 func createLogicalRegex(name string, logic string) string {
 	count := strings.Count(name, logic)
 	wordMatch := "([a-z|A-Z|0-9]*)"
-	regex := "findBy" + wordMatch
+	regex := "FindBy" + wordMatch
 	for i := 0; i < count; i++ {
 		regex += logic + wordMatch
 	}
+	regex += "From(.*)"
 	return regex
 }
 
 
+func CamelToSnake(s string) string {
+	var result string
+	var words []string
+	var lastPos int
+	rs := []rune(s)
 
-func generateFindFunction(fieldFunctionValue reflect.Value, name string, logic string) reflect.Value {
+	for i := 0; i < len(rs); i++ {
+		if i > 0 && unicode.IsUpper(rs[i]) {
+			words = append(words, s[lastPos:i])
+			lastPos = i
+		}
+	}
+
+	// append the last word
+	if s[lastPos:] != "" {
+		words = append(words, s[lastPos:])
+	}
+
+	for k, word := range words {
+		if k > 0 {
+			result += "_"
+		}
+
+		result += strings.ToLower(word)
+	}
+
+	return result
+}
+
+
+
+func generateFindFunction(fieldFunctionValue reflect.Value, name string) reflect.Value {
+
+	var logic string
+	if strings.Contains(name, "Or") {
+		logic = "Or"
+	}
+
+	if strings.Contains(name, "And") {
+		logic = "And"
+	}
+
 	var r *regexp.Regexp
 	if logic == "" {
 		r = regexp.MustCompile(findRegexString)
@@ -41,18 +83,24 @@ func generateFindFunction(fieldFunctionValue reflect.Value, name string, logic s
 		r = regexp.MustCompile(createLogicalRegex(name, logic))
 	}
 
-	found := r.FindAllStringSubmatch(name, 1)
-	fields := found[0][1:]
 
-	collection := found[0][2]
+	found := r.FindAllStringSubmatch(name, 1)
+
+
+	fields := found[0][1:len(found[0]) - 1]
+
+	collection := CamelToSnake(found[0][len(found[0]) - 1])
+
 	fn := func (args []reflect.Value) []reflect.Value {
 		database := mongoConnectorInstance.GetDatabase()
 		defer database.Session.Close()
 
+		//todo We can read the field from the return type or save type
+		//todo read the tag and decide save from there
 		andOrList := make([]bson.M, 0)
 		for i := 0; i < len(fields); i++ {
 			andOrList  = append(andOrList , bson.M{
-				fields[i] : args[i].Interface(),
+				CamelToSnake(fields[i]) : args[i].Interface(),
 			})
 		}
 
@@ -73,11 +121,17 @@ func generateFindFunction(fieldFunctionValue reflect.Value, name string, logic s
 			break
 		}
 
-
-		newValue := reflect.New(fieldFunctionValue.Type().Out(0))
+		firstReturnType := fieldFunctionValue.Type().Out(0)
+		newValue := reflect.New(firstReturnType)
 		newValueInterface := newValue.Interface()
-		
-		err := database.C(collection).Find(selector).One(newValueInterface)
+
+		var err error
+		if firstReturnType.Kind() == reflect.Slice {
+			err = database.C(collection).Find(selector).All(newValueInterface)
+		} else {
+			err = database.C(collection).Find(selector).One(newValueInterface)
+		}
+
 
 		secondValue := reflect.ValueOf(&err).Elem()
 
@@ -108,7 +162,7 @@ func Implement(toImplement interface{}) interface{} {
 
 	for i := 0 ; i < value.Type().NumField(); i ++ {
 		fieldValue := value.Field(i)
-		resultFunction := resolveAndCreateFunc(fieldValue, value.Type().Field(0).Name)
+		resultFunction := resolveAndCreateFunc(fieldValue, value.Type().Field(i).Name)
 		fieldValue.Set(resultFunction)
 	}
 

@@ -32,11 +32,9 @@ type MongoConnector struct {
 	mongoSession *mgo.Session
 
 	mainDatabase string
-	userCollection string
-	messageCollection string
 }
 
-func NewMongoConnector(addrs string, database string, userCollection string, messageCollection string) (*MongoConnector, error) {
+func NewMongoConnector(addrs string, database string) (*MongoConnector, error) {
 	session, err := NewMongoSession(addrs)
 	if err != nil {
 		return nil, err
@@ -45,8 +43,6 @@ func NewMongoConnector(addrs string, database string, userCollection string, mes
 	return &MongoConnector{
 		mongoSession: session,
 		mainDatabase: database,
-		userCollection: userCollection,
-		messageCollection: messageCollection,
 	}, nil
 }
 
@@ -62,9 +58,9 @@ func GetMongoConnectorSingleton() *MongoConnector {
 	return mongoConnectorInstance
 }
 
-func InitializeMongoConnectorSingleton(addrs string, database string, userCollection string, messageCollection string) {
+func InitializeMongoConnectorSingleton(addrs string, database string) {
 	if mongoConnectorInstance == nil {
-		newMongoConnectorInstance, err := NewMongoConnector(addrs, database, userCollection, messageCollection)
+		newMongoConnectorInstance, err := NewMongoConnector(addrs, database)
 		if err != nil {
 			panic(err)
 		}
